@@ -1,0 +1,36 @@
+{
+  "name": "bob-board",
+  "private": true,
+  "version": "0.1.0-beta",
+  "type": "module",
+  "scripts": {
+    "dev:all": "node start-v3.mjs",
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "lint": "oxlint",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@assistant-ui/react": "^0.14.27",
+    "@assistant-ui/react-ui": "^0.2.1",
+    "highlight.js": "^11.11.1",
+    "lucide-react": "^1.26.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "react-markdown": "^10.1.0",
+    "rehype-highlight": "^7.0.2",
+    "remark-gfm": "^4.0.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/node": "^24.13.2",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.3",
+    "oxlint": "^1.71.0",
+    "tailwindcss": "^4.3.3",
+    "typescript": "~6.0.2",
+    "vite": "^8.1.1"
+  },
+  "description": "Local AI support dashboard for HashiCorp Vault & Boundary engineers \u2014 powered by IBM Bob"
+}
