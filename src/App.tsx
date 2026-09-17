@@ -701,6 +701,21 @@ function EmptyState({ onSuggestion }: { onSuggestion: (s: string) => void }) {
       gap: 28,
       padding: '0 24px 40px',
     }}>
+      {/* Hero image */}
+      <img
+        src="/bob-board-hero.png"
+        alt="Bob Board — mission control"
+        style={{
+          width: '100%',
+          maxHeight: 220,
+          objectFit: 'cover',
+          objectPosition: 'center 30%',
+          borderRadius: 'var(--radius)',
+          border: '1px solid var(--border)',
+          display: 'block',
+        }}
+      />
+
       {/* Welcome card — styled like a Navi system message */}
       <div style={{
         width: '100%',
