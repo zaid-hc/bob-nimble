@@ -146,3 +146,32 @@ cd backend && node --test
 | Bob Gateway model discovery | ✅ Working (on connection screen) |
 | Direct Gateway chat | 🔧 Implemented, not default |
 | Interactive tool approvals | 🔧 Not yet connected |
+
+---
+
+## Status notes
+
+### Direct Gateway chat — implemented, not default
+
+Normal chat goes: **your message → Bob Board backend → OpenCode CLI → Bob Gateway → model → response**.
+
+OpenCode is the middle layer that handles the full agent loop — it picks tools, executes MCP calls, manages multi-step reasoning, enforces permissions, and streams the result back.
+
+The direct Gateway path bypasses OpenCode entirely: **your message → Bob Board backend → Bob Gateway HTTP API → model → response**. This path is fully implemented (`backend/beta-runtime.cjs`) and wired into the `/api/chat` route — it authenticates with your IBMid token, streams responses, handles cancellation and timeouts, persists the conversation, and reports token usage.
+
+**Why it is not the default:** without OpenCode in the middle, there is no agent loop — no MCP tools, no skills, no multi-step reasoning. The whole point of Bob Board is that Bob can search GitHub issues, read Vault docs, fetch Confluence pages, and call tools. None of that works on the direct path yet. Switching it on as default before the tool loop is ready would silently give every user a degraded plain-chatbot experience.
+
+The plan: wire up tool execution over the Gateway API, validate it end-to-end, then make it the default and remove the OpenCode requirement.
+
+### Interactive tool approvals — not yet connected
+
+When Bob runs in Agent mode, some actions require your explicit approval before they execute — writing a file, running a shell command, pushing to git. OpenCode handles this today by pausing and waiting for confirmation in the terminal.
+
+Bob Board has no UI for this yet. The backend currently passes preapproved tool permissions to OpenCode for MCP reads and file reads, and blocks everything else. There is no mid-stream approval popup in the chat.
+
+What needs building:
+- The backend intercepts OpenCode's approval prompts mid-stream and emits a structured SSE event
+- The frontend renders an inline approval card in the chat with **Accept / Deny** buttons
+- The user's response unblocks the OpenCode process and streaming continues
+
+Until that is built, Agent mode works for read-only operations and preapproved tools. Write actions (file creation, git operations) are handled through the workspace authoring policy — Bob asks in the chat text before writing, rather than through a real-time button.
