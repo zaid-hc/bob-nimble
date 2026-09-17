@@ -1,5 +1,8 @@
 # Bob Board — Beta
 
+![Bob Board — mission control](public/bob-board-hero.png)
+
+
 > **v0.1.0-beta** · Internal tool for HashiCorp Vault & Boundary support engineers  
 > Works alongside [MCP-Servers](https://github.ibm.com/HashiCorp-Support/MCP-Servers) — install that first.
 
