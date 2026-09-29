@@ -6,7 +6,23 @@ export function providerName(id: string) {
 }
 function label(id: string) {
   const name = id.slice(id.indexOf('/') + 1);
-  return ({ fast: 'Bob · Fast', premium: 'Bob · Premium', explorer: 'Explorer (Haiku 4.5)', 'sonnet-4.5': 'Claude Sonnet 4.5' } as Record<string, string>)[name] || name;
+  return ({
+    'fast': 'Bob · Fast',
+    'premium': 'Bob · Premium (Sonnet 4.5)',
+    'premium-ide': 'Bob · Premium IDE (Sonnet 4.6)',
+    'premium-shell': 'Bob · Premium Shell (Sonnet 4.6)',
+    'ultra': 'Bob · Ultra',
+    'explorer': 'Explorer (Haiku 4.5)',
+    'background': 'Bob · Background',
+    'security': 'Bob · Security',
+    'sonnet-4.5': 'Claude Sonnet 4.5',
+    'wxO-model': 'WatsonX Orchestrate',
+    'gpt-oss-20b': 'GPT-OSS 20B',
+    'openai/gpt-oss-20b': 'GPT-OSS 20B (OpenAI)',
+    'granite-8b-code-instruct': 'Granite 8B Code Instruct',
+    'rnj-1-test': 'RNJ-1 Test',
+    'rnj-1-nextedit-v1-0': 'RNJ-1 NextEdit',
+  } as Record<string, string>)[name] || name;
 }
 function tested(id: string) { return ['ibm-bob/fast', 'ibm-bob/premium'].includes(id); }
 function readHidden(): string[] {
