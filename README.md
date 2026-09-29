@@ -14,9 +14,12 @@ A local web dashboard that wraps IBM Bob with persistent conversations, workspac
 
 | Tool | Version | Notes |
 |------|---------|-------|
+| macOS | any | `start-v3.mjs` uses macOS-only tools (`lsof`); Linux/Windows not tested |
 | Node.js | 20 or 22 | `node --version` |
-| Bob CLI | latest | must be on `$PATH` — `bob --version` |
-| OpenCode | any | required by Bob for inference — installed as part of Bob |
+| IBM Bob CLI | latest | must be on `$PATH` — `bob --version`. This is IBM Bob, not the HashiCorp Vault CLI |
+| OpenCode | v2+ | installed automatically with IBM Bob — `opencode --version` |
+| OpenCode Bob plugin | latest | `@hashicorp/opencode-bob-gateway-plugin` — must be registered in `~/.config/opencode/opencode.json` |
+| IBMid OpenCode session | active | run `opencode auth list` — must show `ibm-bob`. See [Authentication](#authentication) below |
 | MCP-Servers | built | follow [SETUP.md in MCP-Servers](https://github.ibm.com/HashiCorp-Support/MCP-Servers/blob/main/SETUP.md) first |
 | GitHub PAT | `repo` scope | needed by MCP-Servers — set in `mcp.json`, not here |
 
@@ -31,6 +34,39 @@ npm install
 ```
 
 No separate token or API key is required. The dashboard uses the Bob CLI already on your machine.
+
+---
+
+## Authentication
+
+The dashboard routes all chat through OpenCode, which must have an active IBMid session for `ibm-bob`. Check first:
+
+```bash
+opencode auth list
+```
+
+If `ibm-bob` already appears in the list, you are good — skip to [Run](#run).
+
+If it is missing, install the Bob Gateway plugin and authenticate:
+
+```bash
+# 1. Authenticate npm to GitHub Packages
+gh auth refresh --scopes read:packages
+npm config set //npm.pkg.github.com/:_authToken $(gh auth token)
+npm config set @hashicorp:registry https://npm.pkg.github.com/
+
+# 2. Install the plugin globally
+opencode plugin -g "@hashicorp/opencode-bob-gateway-plugin"
+
+# 3. Sign in with IBMid
+opencode auth login ibm-bob --method ibmid
+
+# 4. Verify
+opencode auth list
+# → should show: ibm-bob  oauth
+```
+
+Follow the browser prompt for the IBMid OAuth flow. You only need to do this once — OpenCode stores the session across restarts.
 
 ---
 
@@ -50,11 +86,13 @@ Opens at **http://localhost:3002**. Keep the terminal running — closing it sto
 
 1. **Install MCP-Servers first** — follow [SETUP.md](https://github.ibm.com/HashiCorp-Support/MCP-Servers/blob/main/SETUP.md). The dashboard reads `~/.bob/settings/mcp.json` at startup; any server registered there appears in the MCP picker automatically.
 
-2. **Connect IBMid (optional)** — open **More → Connect IBMid** and sign in. This enables direct Bob Gateway model discovery on that screen. Current chat still runs through OpenCode regardless of whether you connect IBMid.
+2. **Confirm OpenCode is authenticated** — run `opencode auth list` and check that `ibm-bob` appears. If it does not, follow the [Authentication](#authentication) steps above before proceeding. Without an active session the model list will be empty and all chat requests will fail.
 
-3. **Pick a workspace** — use the sidebar to create or register a project folder. Files written by Agent mode land there.
+3. **Connect IBMid (optional)** — open **More → Connect IBMid** and sign in. This enables direct Bob Gateway model discovery on that screen. Current chat still runs through OpenCode regardless of whether you connect IBMid.
 
-4. **Choose a mode** — Ask, Agent, Plan, or Code. Enable relevant MCP servers from the toolbar before sending.
+4. **Pick a workspace** — use the sidebar to create or register a project folder. Files written by Agent mode land there.
+
+5. **Choose a mode** — Ask, Agent, Plan, or Code. Enable relevant MCP servers from the toolbar before sending.
 
 ---
 
