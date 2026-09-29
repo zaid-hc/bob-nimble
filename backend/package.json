@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js",
-    "test": "node --test beta-runtime.test.cjs opencode-adapter.test.cjs"
+    "test": "node --test beta-runtime.test.cjs opencode-adapter.test.cjs bob-gateway-auth.test.cjs bob-gateway-client.test.cjs server-routes.test.cjs"
   },
   "keywords": [],
   "author": "",

@@ -8,6 +8,8 @@
 
 A local web dashboard that wraps IBM Bob with persistent conversations, workspaces, streaming responses, attachment support, MCP server selection, and quick-access links to Salesforce, Confluence, and the IBM Support KB.
 
+![Bob Board demo](public/demo.gif)
+
 ---
 
 ## Prerequisites
