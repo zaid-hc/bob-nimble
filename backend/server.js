@@ -1054,23 +1054,10 @@ async function runShellTurn(req, res, resumeId) {
       send('done', { runId, sessionId: nativeSessionId, exitCode: code, durationMs: Date.now() - startedAt });
       res.end();
     } else if (finalAnswer && finalAnswer.trim() !== streamedText.trim()) {
-      // Stream the attempt_completion result word-by-word so the frontend
-      // renders progressively instead of receiving the full answer at once.
-      // 1 word per tick at ~18ms delay ≈ ~55 words/sec — readable streaming speed.
-      const words = finalAnswer.split(' ');
-      let i = 0;
-      function sendNextChunk() {
-        if (i >= words.length) {
-          send('done', { runId, sessionId: nativeSessionId, exitCode: code, durationMs: Date.now() - startedAt });
-          res.end();
-          return;
-        }
-        const word = (i === 0 ? '' : ' ') + words[i];
-        i += 1;
-        if (word.trim()) send('text', { text: word });
-        setTimeout(sendNextChunk, 30);
-      }
-      sendNextChunk();
+      // Send the full answer as one chunk; the frontend will drip it word-by-word.
+      send('text', { text: finalAnswer });
+      send('done', { runId, sessionId: nativeSessionId, exitCode: code, durationMs: Date.now() - startedAt });
+      res.end();
     } else {
       send('done', { runId, sessionId: nativeSessionId, exitCode: code, durationMs: Date.now() - startedAt });
       res.end();

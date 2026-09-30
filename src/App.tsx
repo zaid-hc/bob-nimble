@@ -411,34 +411,57 @@ export default function App() {
       },
       onText: (chunk, sid, replace) => {
         if (generation !== turnGeneration.current) return;
-        if (responseId === null) {
-          responseId = turnStartedAt + 1;
-          const msg: Message = {
-            id: responseId, session_id: sid ?? activeId ?? '',
-            role: 'assistant', content: chunk, ts: Date.now(),
+
+        // Helper that appends (or replaces) one piece of text in the message list.
+        const applyChunk = (text: string, isReplace: boolean) => {
+          if (responseId === null) {
+            responseId = turnStartedAt + 1;
+            const msg: Message = {
+              id: responseId, session_id: sid ?? activeId ?? '',
+              role: 'assistant', content: text, ts: Date.now(),
+            };
+            setMessages(prev => [...prev, msg]);
+            setStreamingMsgId(responseId);
+          } else {
+            const id = responseId;
+            setMessages(prev => prev.map(message => (
+              message.id === id
+                ? { ...message, content: isReplace ? text : message.content + text }
+                : message
+            )));
+          }
+          setThinkingByMessage(prev => ({
+            ...prev,
+            [responseId!]: {
+              toolCalls: turnTools,
+              activities: turnActivities,
+              startedAt: turnStartedAt,
+              durationMs: Date.now() - turnStartedAt,
+            },
+          }));
+          setPendingTools([]);
+          setPendingActivities([]);
+          setTimeout(scrollToBottom, 50);
+        };
+
+        // If the chunk is large (attempt_completion full answer arriving at once),
+        // drip it word-by-word at 30ms/word so it visually streams in the UI.
+        // Small chunks (real token-by-token deltas) are applied immediately.
+        const DRIP_THRESHOLD = 60; // characters — real deltas are always smaller
+        if (!replace && chunk.length > DRIP_THRESHOLD) {
+          const words = chunk.split(/(\s+)/);
+          let i = 0;
+          const drip = () => {
+            if (generation !== turnGeneration.current) return; // stale turn, stop
+            if (i >= words.length) return;
+            applyChunk(words[i], false);
+            i++;
+            setTimeout(drip, 30);
           };
-          setMessages(prev => [...prev, msg]);
-          setStreamingMsgId(responseId);
+          drip();
         } else {
-          const id = responseId;
-          setMessages(prev => prev.map(message => (
-            message.id === id
-              ? { ...message, content: replace ? chunk : message.content + chunk }
-              : message
-          )));
+          applyChunk(chunk, replace ?? false);
         }
-        setThinkingByMessage(prev => ({
-          ...prev,
-          [responseId!]: {
-            toolCalls: turnTools,
-            activities: turnActivities,
-            startedAt: turnStartedAt,
-            durationMs: Date.now() - turnStartedAt,
-          },
-        }));
-        setPendingTools([]);
-        setPendingActivities([]);
-        setTimeout(scrollToBottom, 50);
       },
       onDone: (sid, code, status) => {
         if (generation !== turnGeneration.current) return;
