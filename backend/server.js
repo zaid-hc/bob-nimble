@@ -949,6 +949,8 @@ async function runShellTurn(req, res, resumeId) {
   res.setHeader('Connection', 'keep-alive');
   res.setHeader('X-Accel-Buffering', 'no');
   res.flushHeaders();
+  // Disable Nagle's algorithm so each SSE chunk is flushed to the client immediately.
+  res.socket?.setNoDelay(true);
 
   const runId = crypto.randomUUID();
   const startedAt = Date.now();
@@ -1066,7 +1068,7 @@ async function runShellTurn(req, res, resumeId) {
         const word = (i === 0 ? '' : ' ') + words[i];
         i += 1;
         if (word.trim()) send('text', { text: word });
-        setTimeout(sendNextChunk, 18);
+        setTimeout(sendNextChunk, 30);
       }
       sendNextChunk();
     } else {
