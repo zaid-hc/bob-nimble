@@ -1049,11 +1049,30 @@ async function runShellTurn(req, res, resumeId) {
 
     if (cancelReason) {
       send('error', { message: cancelReason });
+      send('done', { runId, sessionId: nativeSessionId, exitCode: code, durationMs: Date.now() - startedAt });
+      res.end();
     } else if (finalAnswer && finalAnswer.trim() !== streamedText.trim()) {
-      send('text', { text: finalAnswer });
+      // Stream the attempt_completion result word-by-word so the frontend
+      // renders progressively instead of receiving the full answer at once.
+      const words = finalAnswer.split(/(\s+)/);
+      let i = 0;
+      function sendNextChunk() {
+        if (i >= words.length) {
+          send('done', { runId, sessionId: nativeSessionId, exitCode: code, durationMs: Date.now() - startedAt });
+          res.end();
+          return;
+        }
+        // Send in small bursts (3 tokens at a time) to balance speed vs chunk count
+        const burst = words.slice(i, i + 3).join('');
+        i += 3;
+        if (burst) send('text', { text: burst });
+        setImmediate(sendNextChunk);
+      }
+      sendNextChunk();
+    } else {
+      send('done', { runId, sessionId: nativeSessionId, exitCode: code, durationMs: Date.now() - startedAt });
+      res.end();
     }
-    send('done', { runId, sessionId: nativeSessionId, exitCode: code, durationMs: Date.now() - startedAt });
-    res.end();
   });
 
   res.on('close', () => {
