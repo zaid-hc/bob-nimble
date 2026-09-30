@@ -1054,7 +1054,8 @@ async function runShellTurn(req, res, resumeId) {
     } else if (finalAnswer && finalAnswer.trim() !== streamedText.trim()) {
       // Stream the attempt_completion result word-by-word so the frontend
       // renders progressively instead of receiving the full answer at once.
-      const words = finalAnswer.split(/(\s+)/);
+      // 1 word per tick at ~18ms delay ≈ ~55 words/sec — readable streaming speed.
+      const words = finalAnswer.split(' ');
       let i = 0;
       function sendNextChunk() {
         if (i >= words.length) {
@@ -1062,11 +1063,10 @@ async function runShellTurn(req, res, resumeId) {
           res.end();
           return;
         }
-        // Send in small bursts (3 tokens at a time) to balance speed vs chunk count
-        const burst = words.slice(i, i + 3).join('');
-        i += 3;
-        if (burst) send('text', { text: burst });
-        setImmediate(sendNextChunk);
+        const word = (i === 0 ? '' : ' ') + words[i];
+        i += 1;
+        if (word.trim()) send('text', { text: word });
+        setTimeout(sendNextChunk, 18);
       }
       sendNextChunk();
     } else {
