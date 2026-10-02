@@ -659,6 +659,7 @@ export default function App() {
               onModeChange={setMode}
               presetSkill={presetSkill || undefined}
               onPresetSkillUsed={() => setPresetSkill('')}
+              hasWorkspace={workspaces.some(w => w.id === activeWorkspaceId)}
             />
           </div>
         </div>

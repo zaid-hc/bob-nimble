@@ -18,6 +18,8 @@ interface Props {
   /** Pre-set a skill from an external source (right panel) */
   presetSkill?: string;
   onPresetSkillUsed?: () => void;
+  /** Whether a valid workspace is active; attachments require one. */
+  hasWorkspace?: boolean;
 }
 
 export const Composer: FC<Props> = ({
@@ -25,6 +27,7 @@ export const Composer: FC<Props> = ({
   modes, skills, mcps, profiles, selectedProfileId, onProfileChange,
   currentMode, onModeChange,
   presetSkill, onPresetSkillUsed,
+  hasWorkspace = true,
 }) => {
   const [text,         setText]         = useState('');
   const [activeSkill,  setActiveSkill]  = useState('');
@@ -34,6 +37,10 @@ export const Composer: FC<Props> = ({
   const [showAttachments, setShowAttachments] = useState(false);
   const [attachments, setAttachments] = useState<File[]>([]);
   const [attachmentError, setAttachmentError] = useState('');
+  const [filePreview, setFilePreview] = useState<File[] | null>(null);
+  const [previewSelection, setPreviewSelection] = useState<File[]>([]);
+  const [previewSearch, setPreviewSearch] = useState('');
+  const [uploadSummary, setUploadSummary] = useState('');
   const [preparing, setPreparing] = useState(false);
   const [automaticActions, setAutomaticActions] = useState(false);
   const [dismissedSuggestions, setDismissedSuggestions] = useState<string[]>([]);
@@ -100,7 +107,7 @@ export const Composer: FC<Props> = ({
   // ── Submit ────────────────────────────────────────────────────────────────
   const submit = useCallback(async () => {
     const msg = text.trim();
-    if (!msg || loading || preparing) return;
+    if (!msg || loading || preparing || filePreview) return;
     setPreparing(true);
     setAttachmentError('');
     try {
@@ -108,7 +115,7 @@ export const Composer: FC<Props> = ({
       if (accepted) { setText(''); setActiveSkill(''); setAttachments([]); setAutomaticActions(false); }
     } catch (error) { setAttachmentError(error instanceof Error ? error.message : 'Could not send the attachments. Please try again.'); }
     finally { setPreparing(false); }
-  }, [text, loading, preparing, currentMode, activeSkill, effectiveMcps, attachments, automaticActions, onSubmit]);
+  }, [text, loading, preparing, filePreview, currentMode, activeSkill, effectiveMcps, attachments, automaticActions, onSubmit]);
 
   // ── Keyboard handling ─────────────────────────────────────────────────────
   const handleKey = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -150,25 +157,36 @@ export const Composer: FC<Props> = ({
     textareaRef.current?.focus();
   };
 
-  const canSend = text.trim().length > 0 && !loading && !preparing;
+  const canSend = text.trim().length > 0 && !loading && !preparing && !filePreview;
 
   const addAttachments = (files: FileList | null) => {
     if (!files || loading || preparing) return;
     // Copy the selection before the input is reset, otherwise the browser
     // clears the live FileList before React applies the state update.
     const pickedFiles = Array.from(files);
-    const next = [...attachments];
-    const errors: string[] = [];
-      for (const file of pickedFiles) {
-        const alreadyAdded = next.some(item => item.name === file.name && item.size === file.size && item.lastModified === file.lastModified);
-        if (alreadyAdded) continue;
-        if (!/\.(txt|log|md|markdown|tf|tfvars|hcl|json|ya?ml|go|sh|ps1|py|jsx?|tsx?|csv|xml|html|css|sql|conf|ini|toml|properties)$/i.test(file.name)) errors.push(`${file.name}: only text, code and logs are supported.`);
-        else if (file.size > 15 * 1024 * 1024) errors.push(`${file.name}: exceeds 15 MB.`);
-        else if (next.length >= 4) errors.push(`${file.name}: only 4 files per message.`);
-        else next.push(file);
-      }
-    setAttachments(next);
-    setAttachmentError(errors.join(' '));
+    const eligible: File[] = [];
+    const skipped = { excluded: 0, unsupported: 0, oversized: 0, duplicate: 0 };
+    for (const file of pickedFiles) {
+      const path = (file.webkitRelativePath || file.name).replace(/\\/g, '/');
+      // Exclude repository internals, dependencies, generated output and common
+      // credential files before reading or uploading any content.
+      if (/(^|\/)(\.git|\.hg|\.svn|node_modules|vendor|dist|build|coverage|\.next|\.cache|__pycache__|\.venv|venv|\.terraform|\.aws|\.ssh)(\/|$)/i.test(path)
+        || /(^|\/)(\.env(?:\..*)?|credentials(?:\..*)?|secrets?(?:\..*)?|id_rsa|id_ed25519|.*\.(?:pem|key|p12|pfx|tfstate)(?:\..*)?)$/i.test(path)) { skipped.excluded++; continue; }
+      if (!/\.(txt|log|md|markdown|tf|tfvars|hcl|json|ya?ml|go|sh|ps1|py|jsx?|tsx?|csv|xml|html|css|sql|conf|ini|toml|properties)$/i.test(file.name)) { skipped.unsupported++; continue; }
+      if (file.size > 15 * 1024 * 1024) { skipped.oversized++; continue; }
+      if ([...attachments, ...eligible].some(item => (item.webkitRelativePath || item.name) === path && item.size === file.size && item.lastModified === file.lastModified)) { skipped.duplicate++; continue; }
+      eligible.push(file);
+    }
+    setUploadSummary([
+      skipped.excluded && `${skipped.excluded} repository, generated or sensitive files excluded`,
+      skipped.unsupported && `${skipped.unsupported} unsupported files skipped`,
+      skipped.oversized && `${skipped.oversized} files over 15 MB skipped`,
+      skipped.duplicate && `${skipped.duplicate} already selected files skipped`,
+    ].filter(Boolean).join(' · '));
+    setAttachmentError('');
+    setFilePreview(eligible.sort((a, b) => (a.webkitRelativePath || a.name).localeCompare(b.webkitRelativePath || b.name)));
+    setPreviewSelection([]);
+    setPreviewSearch('');
     setShowAttachments(false);
   };
 
@@ -291,12 +309,43 @@ export const Composer: FC<Props> = ({
 
         <div style={{ position: 'relative' }}>
           {attachmentError && <div role="alert" style={{ padding: '10px 12px', color: 'var(--red)', fontSize: 'calc(var(--base-font-size) * 12 / 14)' }}>{attachmentError}</div>}
+          {filePreview !== null && (
+            <section aria-label="Review files before attaching" style={{ padding: 12, borderBottom: '1px solid var(--border2)', color: 'var(--text2)', fontSize: 'calc(var(--base-font-size) * 12 / 14)' }}>
+              <strong>Choose files to attach · {previewSelection.length}/{Math.max(0, 4 - attachments.length)} available</strong>
+              <p>Up to 4 files per message, 15 MB each. Review files for secrets before sending.</p>
+              {uploadSummary && <p role="status" style={{ color: 'var(--muted)' }}>{uploadSummary}</p>}
+              {filePreview.length === 0 ? <p>No eligible files found. Choose text, code or log files.</p> : <>
+                <input aria-label="Search files" placeholder={`Search ${filePreview.length} eligible files…`} value={previewSearch} onChange={event => setPreviewSearch(event.target.value)} style={{ width: '100%', padding: 8, background: 'var(--surface3)', color: 'var(--text)', border: '1px solid var(--border2)', borderRadius: 6 }} />
+                <div style={{ maxHeight: 200, overflowY: 'auto', margin: '8px 0' }}>
+                  {filePreview.filter(file => (file.webkitRelativePath || file.name).toLowerCase().includes(previewSearch.toLowerCase())).map(file => (
+                    <label key={file.webkitRelativePath || file.name} style={{ display: 'flex', gap: 8, padding: '5px 0', overflowWrap: 'anywhere' }}>
+                      <input type="checkbox" checked={previewSelection.includes(file)} disabled={!previewSelection.includes(file) && previewSelection.length >= 4 - attachments.length} onChange={event => setPreviewSelection(current => event.target.checked ? [...current, file] : current.filter(item => item !== file))} />
+                      <span>{file.webkitRelativePath || file.name} <span style={{ color: 'var(--muted)' }}>({Math.ceil(file.size / 1024)} KB)</span></span>
+                    </label>
+                  ))}
+                </div>
+              </>}
+              <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+                <button
+                  type="button"
+                  disabled={!previewSelection.length}
+                  onClick={() => { setAttachments(current => [...current, ...previewSelection].slice(0, 4)); setFilePreview(null); setPreviewSelection([]); }}
+                  style={{ padding: '7px 14px', borderRadius: 6, border: 'none', background: previewSelection.length ? 'var(--accent)' : 'var(--surface3)', color: previewSelection.length ? '#fff' : 'var(--muted)', fontWeight: 600, fontSize: 'calc(var(--base-font-size) * 12 / 14)', cursor: previewSelection.length ? 'pointer' : 'not-allowed', transition: 'background 0.15s' }}
+                >Attach {previewSelection.length || ''} selected</button>
+                <button
+                  type="button"
+                  onClick={() => { setFilePreview(null); setPreviewSelection([]); }}
+                  style={{ padding: '7px 14px', borderRadius: 6, border: '1px solid var(--border2)', background: 'transparent', color: 'var(--text2)', fontSize: 'calc(var(--base-font-size) * 12 / 14)', cursor: 'pointer' }}
+                >Cancel</button>
+              </div>
+            </section>
+          )}
           {preparing && <div role="status" style={{ padding: '8px 12px', color: 'var(--muted)', fontSize: 'calc(var(--base-font-size) * 12 / 14)' }}>Preparing message and uploading files…</div>}
           {attachments.length > 0 && (
             <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', padding: '9px 12px 0' }}>
               <span style={{ alignSelf: 'center', fontSize: 'calc(var(--base-font-size) * 10 / 14)', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--muted)' }}>Selected · {attachments.length}/4</span>
               {attachments.map(file => (
-                <button disabled={loading || preparing} key={`${file.name}-${file.lastModified}`} onClick={() => setAttachments(current => current.filter(item => item !== file))} title="Remove" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, maxWidth: 210, padding: '3px 7px', border: '1px solid var(--border2)', borderRadius: 999, background: 'var(--surface3)', color: 'var(--text2)', fontSize: 'calc(var(--base-font-size) * 11 / 14)', cursor: 'pointer' }}>
+                <button disabled={loading || preparing} key={`${file.webkitRelativePath || file.name}-${file.lastModified}`} onClick={() => setAttachments(current => current.filter(item => item !== file))} title={`Remove ${file.webkitRelativePath || file.name}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, maxWidth: 210, padding: '3px 7px', border: '1px solid var(--border2)', borderRadius: 999, background: 'var(--surface3)', color: 'var(--text2)', fontSize: 'calc(var(--base-font-size) * 11 / 14)', cursor: 'pointer' }}>
                   <File size={12} /><span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{file.name}</span><X size={11} />
                 </button>
               ))}
@@ -325,10 +374,16 @@ export const Composer: FC<Props> = ({
           <button onClick={() => setShowSetup(open => !open)} aria-label={showSetup ? 'Hide controls' : 'Show controls'} title={showSetup ? 'Hide controls' : 'Show controls'} style={{ position: 'absolute', right: 50, bottom: 10, width: 32, height: 32, borderRadius: '50%', border: '1px solid var(--border)', display: 'grid', placeItems: 'center', cursor: 'pointer', background: showSetup ? 'var(--surface3)' : 'transparent', color: 'var(--text2)' }}>
             <SlidersHorizontal size={14} />
           </button>
-          <button onClick={() => setShowAttachments(open => !open)} aria-label="Attachment options" title="Add files or folders" style={{ position: 'absolute', left: 12, bottom: 10, width: 32, height: 32, borderRadius: '50%', border: '1px solid var(--border)', display: 'grid', placeItems: 'center', cursor: 'pointer', background: showAttachments ? 'var(--surface3)' : 'transparent', color: 'var(--text2)' }}>
+          <button
+            onClick={() => hasWorkspace && setShowAttachments(open => !open)}
+            aria-label={hasWorkspace ? 'Attachment options' : 'Select a workspace to attach files'}
+            title={hasWorkspace ? 'Add files or folders' : 'Select a workspace first — attachments are saved there'}
+            disabled={!hasWorkspace}
+            style={{ position: 'absolute', left: 12, bottom: 10, width: 32, height: 32, borderRadius: '50%', border: '1px solid var(--border)', display: 'grid', placeItems: 'center', cursor: hasWorkspace ? 'pointer' : 'not-allowed', background: showAttachments ? 'var(--surface3)' : 'transparent', color: hasWorkspace ? 'var(--text2)' : 'var(--muted)', opacity: hasWorkspace ? 1 : 0.45 }}
+          >
             <Plus size={17} />
           </button>
-          {showAttachments && (
+          {showAttachments && hasWorkspace && (
             <div style={{ position: 'absolute', left: 12, bottom: 48, width: 210, padding: 6, border: '1px solid var(--border2)', borderRadius: 10, background: 'var(--elevated)', boxShadow: 'var(--shadow)', zIndex: 20 }}>
               <div style={{ padding: '5px 7px 7px', fontSize: 'calc(var(--base-font-size) * 10 / 14)', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--muted)' }}>Files and folders</div>
               <button onClick={() => fileInputRef.current?.click()} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '8px 7px', border: 'none', borderRadius: 6, textAlign: 'left', background: 'transparent', color: 'var(--text2)', cursor: 'pointer' }}><File size={14} /><span style={{ fontSize: 'calc(var(--base-font-size) * 12 / 14)' }}>Files</span></button>
