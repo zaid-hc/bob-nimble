@@ -392,9 +392,12 @@ function createWorkspace(name, requestedPath) {
 
 // ── Express setup ───────────────────────────────────────────────────────────
 // Allow the local React development clients to make cross-origin requests.
-// Only the /api/chat SSE endpoint needs this (direct fetch to avoid proxy buffering).
+// Frontend port is derived from the backend PORT env var (PORT-1 by convention: 3100->3002, 3101->3003).
+const FRONTEND_PORT = Number(PORT) - 1;
 const allowedLocalOrigins = new Set([
-  'http://localhost:3002',
+  `http://localhost:${FRONTEND_PORT}`,
+  `http://127.0.0.1:${FRONTEND_PORT}`,
+  'http://localhost:3002',   // keep default for control board
   'http://127.0.0.1:3002',
 ]);
 
