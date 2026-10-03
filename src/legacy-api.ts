@@ -5,7 +5,7 @@ const BASE = '';  // same-origin REST calls via Vite proxy
 // /api/chat uses SSE. Vite's http-proxy buffers the response body before
 // forwarding, so all events arrive at once and React collapses the state
 // updates. Fix: call the backend directly (CORS is enabled on :3000 for :3001).
-const BACKEND = `${window.location.protocol}//${window.location.hostname}:3100`;
+const BACKEND = ''; // same-origin: routed through Vite proxy to backend
 let localTokenPromise: Promise<string> | null = null;
 
 export const api = {

@@ -113,15 +113,18 @@ function ideConversationBridge() {
   }
 }
 
+const FRONTEND_PORT = Number(process.env.PORT) || 3003;
+const BACKEND_PORT  = Number(process.env.VITE_BACKEND_PORT) || 3101;
+
 export default defineConfig({
   plugins: [react(), tailwindcss(), ideConversationBridge(), modelLab()],
   server: {
-    port: 3002,
+    port: FRONTEND_PORT,
     host: '127.0.0.1',
     strictPort: true,
     proxy: {
       '/api': {
-        target: 'http://127.0.0.1:3100',
+        target: `http://127.0.0.1:${BACKEND_PORT}`,
         changeOrigin: true,
       },
     },

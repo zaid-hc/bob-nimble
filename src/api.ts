@@ -1,6 +1,6 @@
 import type { Session, SessionDetail, Mode, Skill, Mcp, ToolCallEvent, ActivityEvent, Workspace, SourceFile, ConfluencePage, SessionUsage } from './types';
 
-const BACKEND = `${window.location.protocol}//${window.location.hostname}:3100`;
+const BACKEND = ''; // same-origin: routed through Vite proxy to backend
 let tokenPromise: Promise<string> | undefined;
 async function localToken(): Promise<string> {
   if (!tokenPromise) tokenPromise = fetch('/api/local-auth', { credentials: 'include', cache: 'no-store' })
