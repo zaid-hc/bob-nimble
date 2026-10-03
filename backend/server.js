@@ -392,12 +392,13 @@ function createWorkspace(name, requestedPath) {
 
 // ── Express setup ───────────────────────────────────────────────────────────
 // Allow the local React development clients to make cross-origin requests.
-// Frontend port is derived from the backend PORT env var (PORT-1 by convention: 3100->3002, 3101->3003).
-const FRONTEND_PORT = Number(PORT) - 1;
+// FRONTEND_PORT is set by start-nimble.mjs (or start-v3.mjs) via env var.
+// Falls back to 3002 (the default control board port) if not set.
+const FRONTEND_PORT = process.env.FRONTEND_PORT || '3002';
 const allowedLocalOrigins = new Set([
   `http://localhost:${FRONTEND_PORT}`,
   `http://127.0.0.1:${FRONTEND_PORT}`,
-  'http://localhost:3002',   // keep default for control board
+  'http://localhost:3002',
   'http://127.0.0.1:3002',
 ]);
 

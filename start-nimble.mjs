@@ -32,6 +32,7 @@ const backendEnv = {
   ...process.env,
   PORT:          String(BACKEND_PORT),
   HOST:          '127.0.0.1',
+  FRONTEND_PORT: String(FRONTEND_PORT),   // passed so server.js knows the trusted origin
   BOB_HOME,
   BOB_WORKSPACE,
   DB_PATH,
