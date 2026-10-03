@@ -52,6 +52,8 @@ export const api = {
   modes: (): Promise<Mode[]> => get('/api/modes'),
   skills: (): Promise<Skill[]> => get('/api/skills'),
   mcps: (): Promise<Mcp[]> => get('/api/mcps'),
+  triageStatus: (): Promise<{ available: boolean; ollamaRunning: boolean }> => get('/api/triage/status'),
+  triage: (message: string): Promise<{ skill: string | null; mcps: string[]; urgency: number; confidence: number; durationMs: number }> => post('/api/triage', { message }),
   workspaces: (): Promise<Workspace[]> => get('/api/workspaces'),
   createWorkspace: (name: string, path?: string): Promise<Workspace> => post('/api/workspaces', { name, path }),
   file: (filePath: string, workspaceId: string): Promise<SourceFile> => get(`/api/files?workspaceId=${encodeURIComponent(workspaceId)}&path=${encodeURIComponent(filePath)}`),

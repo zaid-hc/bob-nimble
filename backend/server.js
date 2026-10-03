@@ -12,6 +12,7 @@ const { MAX_FILE_BYTES, validateAttachment, exactFile, chatArgs, startChatRun, s
 const chatRuns = new Map();
 const openCode = require('./opencode-adapter.cjs');
 const gatewayAuth = require('./bob-gateway-auth.cjs').createBobAuth();
+const nimbleTriage = require('./nimble-triage.cjs');
 
 const app = express();
 const PORT = process.env.PORT || 3100;
@@ -472,6 +473,31 @@ app.post('/api/gateway/auth/select', (req, res) => {
 });
 app.get('/api/skills',  (_req, res) => res.json(loadSkills()));
 app.get('/api/mcps',    (_req, res) => res.json(loadMcps()));
+
+/** Check whether Ollama + Nimble are available. */
+app.get('/api/triage/status', async (_req, res) => {
+  try {
+    const status = await nimbleTriage.checkAvailability();
+    res.json(status);
+  } catch { res.json({ available: false, ollamaRunning: false, models: [] }); }
+});
+
+/**
+ * Run Nimble pre-flight triage on a message.
+ * Returns { skill, mcps, urgency, confidence, durationMs } or { skill: null, mcps: [] } on fallback.
+ * Never throws — always returns a valid (possibly empty) suggestion.
+ */
+app.post('/api/triage', express.json({ limit: '64kb' }), async (req, res) => {
+  const { message } = req.body || {};
+  if (!message || typeof message !== 'string' || !message.trim()) {
+    return res.status(400).json({ error: 'message is required' });
+  }
+  try {
+    const result = await nimbleTriage.triage(message);
+    res.json(result ?? { skill: null, mcps: [], urgency: 0, confidence: 0, durationMs: 0 });
+  } catch { res.json({ skill: null, mcps: [], urgency: 0, confidence: 0, durationMs: 0 }); }
+});
+
 app.get('/api/models', async (_req, res) => {
   try { res.json({ models: await openCode.models() }); }
   catch (error) { res.status(503).json({ error: error.message }); }

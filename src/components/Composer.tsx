@@ -1,6 +1,7 @@
 import { type FC, type ReactNode, useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { ArrowUp, File, Folder, Plus, SlidersHorizontal, Square, X } from 'lucide-react';
 import type { Mode, Skill, Mcp, SupportProfile } from '../types';
+import { api } from '../api';
 
 interface Props {
   modelControls?: ReactNode;
@@ -43,6 +44,8 @@ export const Composer: FC<Props> = ({
   const [uploadSummary, setUploadSummary] = useState('');
   const [preparing, setPreparing] = useState(false);
   const [automaticActions, setAutomaticActions] = useState(false);
+  const [triageEnabled, setTriageEnabled] = useState(true); // set false if Ollama/Nimble not available
+  const [triageSuggestion, setTriageSuggestion] = useState<{ skill: string; mcps: string[]; confidence: number } | null>(null);
   const [dismissedSuggestions, setDismissedSuggestions] = useState<string[]>([]);
   const profile = profiles.find(item => item.id === selectedProfileId);
   const effectiveMcps = useMemo(() => [...new Set([...(profile?.mcps ?? []), ...selectedMcps])], [profile, selectedMcps]);
@@ -110,12 +113,34 @@ export const Composer: FC<Props> = ({
     if (!msg || loading || preparing || filePreview) return;
     setPreparing(true);
     setAttachmentError('');
+    setTriageSuggestion(null);
     try {
-      const accepted = await onSubmit({ message: msg, mode: currentMode, skill: activeSkill || undefined, mcps: effectiveMcps, files: attachments, automaticActions });
+      // ── Nimble pre-flight triage (runs locally, ~100ms, zero Bob tokens) ──
+      let finalSkill = activeSkill || undefined;
+      let finalMcps  = [...effectiveMcps];
+      if (triageEnabled && !activeSkill) {
+        try {
+          const t = await api.triage(msg);
+          if (t.skill || t.mcps.length > 0) {
+            if (t.skill && t.confidence > 0.55) finalSkill = t.skill;
+            // Merge Nimble MCP suggestions with user-selected ones (no duplicates)
+            const available = new Set(mcps.map(m => m.name));
+            const nimbleMcps = t.mcps.filter(name => available.has(name) && !finalMcps.includes(name));
+            finalMcps = [...new Set([...finalMcps, ...nimbleMcps])];
+            if (t.skill || nimbleMcps.length > 0) {
+              setTriageSuggestion({ skill: t.skill ?? '', mcps: nimbleMcps, confidence: t.confidence });
+            }
+          }
+        } catch {
+          // Nimble unavailable — proceed normally, disable future attempts this session
+          setTriageEnabled(false);
+        }
+      }
+      const accepted = await onSubmit({ message: msg, mode: currentMode, skill: finalSkill, mcps: finalMcps, files: attachments, automaticActions });
       if (accepted) { setText(''); setActiveSkill(''); setAttachments([]); setAutomaticActions(false); }
     } catch (error) { setAttachmentError(error instanceof Error ? error.message : 'Could not send the attachments. Please try again.'); }
     finally { setPreparing(false); }
-  }, [text, loading, preparing, filePreview, currentMode, activeSkill, effectiveMcps, attachments, automaticActions, onSubmit]);
+  }, [text, loading, preparing, filePreview, currentMode, activeSkill, effectiveMcps, mcps, attachments, automaticActions, triageEnabled, onSubmit]);
 
   // ── Keyboard handling ─────────────────────────────────────────────────────
   const handleKey = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -341,6 +366,13 @@ export const Composer: FC<Props> = ({
             </section>
           )}
           {preparing && <div role="status" style={{ padding: '8px 12px', color: 'var(--muted)', fontSize: 'calc(var(--base-font-size) * 12 / 14)' }}>Preparing message and uploading files…</div>}
+          {triageSuggestion && !loading && !preparing && (
+            <div role="status" aria-label="Nimble auto-triage result" style={{ display: 'flex', flexWrap: 'wrap', gap: 5, padding: '6px 12px', fontSize: 'calc(var(--base-font-size) * 11 / 14)', color: 'var(--muted)' }}>
+              <span style={{ fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', marginRight: 2 }}>⚡ Nimble:</span>
+              {triageSuggestion.skill && <span title={`Auto-selected skill (${Math.round(triageSuggestion.confidence * 100)}% confidence)`} style={{ padding: '1px 7px', borderRadius: 999, background: 'var(--surface3)', border: '1px solid var(--border2)' }}>{triageSuggestion.skill}</span>}
+              {triageSuggestion.mcps.map(name => <span key={name} title="Auto-added MCP server" style={{ padding: '1px 7px', borderRadius: 999, background: 'var(--surface3)', border: '1px solid var(--border2)' }}>{name.replace('-support-mcp', '').replace('-mcp', '')}</span>)}
+            </div>
+          )}
           {attachments.length > 0 && (
             <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', padding: '9px 12px 0' }}>
               <span style={{ alignSelf: 'center', fontSize: 'calc(var(--base-font-size) * 10 / 14)', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--muted)' }}>Selected · {attachments.length}/4</span>
