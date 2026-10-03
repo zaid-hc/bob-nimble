@@ -12,7 +12,7 @@ const FRONTEND_PORT = 3003;
 
 // Isolated paths — nothing shared with the control board
 const BOB_HOME      = path.join(homedir(), '.bob');
-const BOB_WORKSPACE = path.join(homedir(), '.bob', 'nimble-playground');
+const BOB_WORKSPACE = path.join(homedir(), '.bob', 'playground'); // shared with control board for fair benchmarking
 const DB_PATH       = path.join(root, 'backend', 'data', 'nimble-sessions.db');
 
 async function busy(port) {
