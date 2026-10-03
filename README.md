@@ -30,7 +30,7 @@ A local web dashboard that wraps IBM Bob with persistent conversations, workspac
 ## Install
 
 ```bash
-git clone https://github.ibm.com/HashiCorp-Support/bob-web-v3.git ~/dashboard
+git clone https://github.ibm.com/HashiCorp-Support/bob-board.git ~/dashboard
 cd ~/dashboard
 npm install
 ```
